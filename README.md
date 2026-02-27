@@ -1,123 +1,105 @@
-# MoE Router Simulator
+# MoE 路由模拟器
 
-A simulation framework for evaluating different routing strategies in Mixture-of-Experts (MoE) architectures with multi-level storage hierarchies (DDR + Flash/PIM).
+用于评估不同路由策略的模拟框架，适用于多级存储层次结构（DDR + Flash/PIM）的 MoE（混合专家）架构。
 
-## Overview
+## 功能特点
 
-This project simulates various expert routing strategies for MoE models under different storage configurations:
+- **多种路由策略**: LRU、PIM-Only、Hybrid、Fixed-Split、Cache-Only
+- **可配置带宽模型**: 归一化带宽比例（Flash→DDR、DDR→NPU、Flash→PIM）
+- **灵活工作负载**: 可调节的时间局部性（smoothness）
+- **全面指标**: 延迟、缓存命中率、k1/k2/k3 分布
 
-- **DDR + NPU**: High-bandwidth path for compute-intensive experts
-- **Flash + PIM**: Lower-bandwidth path for memory-bound experts  
-- **DDR Cache**: LRU-managed cache for expert reuse
-
-### Key Features
-
-- **Multiple Routing Strategies**: LRU, PIM-Only, Hybrid, Fixed-Split, Cache-Only
-- **Configurable Bandwidth Model**: Normalized bandwidth ratios (Flash→DDR, DDR→NPU, Flash→PIM)
-- **Flexible Workload Patterns**: Adjustable smoothness for temporal locality
-- **Comprehensive Metrics**: Latency, cache hit rate, k1/k2/k3 distribution
-
-## Installation
+## 快速开始
 
 ```bash
-# Clone the repository
+# 克隆仓库
 git clone git@github.com:hanlinxuy/my_ana_model.git
 cd my_ana_model
 
-# Install dependencies
-pip install -e moe_simulator/
-# Or use PYTHONPATH
-export PYTHONPATH=.
-```
-
-## Quick Start
-
-```bash
-# Run with default config (all strategies, smoothness levels)
+# 运行（使用默认配置）
 PYTHONPATH=. python3 moe_simulator/main.py
 
-# Run specific strategies
+# 运行特定策略
 PYTHONPATH=. python3 moe_simulator/main.py --strategies lru,hybrid,pim-only
 
-# Custom config
+# 自定义配置
 PYTHONPATH=. python3 moe_simulator/main.py --config examples/config.yaml --output results.csv
 ```
 
-## CLI Options
+## 命令行参数
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--config` | Path to YAML config file | built-in defaults |
-| `--strategies` | Comma-separated strategy list | all strategies |
-| `--smoothness` | Comma-separated smoothness levels | 0.0, 0.5, 0.9, 0.99, 1.0 |
-| `--output` | CSV output path | results.csv |
-| `--num-tokens` | Number of tokens to simulate | 1000 |
-| `--num-experts` | Total number of experts | 128 |
-| `--K` | Experts selected per token | 8 |
-| `--cache-size` | DDR cache capacity | 32 |
-| `--k1` | DDR load budget | 3 |
-| `--k2` | PIM compute budget | 2 |
-| `--quiet` | Suppress console output | false |
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--config` | 配置文件路径 | 内置默认值 |
+| `--strategies` | 策略列表（逗号分隔） | 所有策略 |
+| `--smoothness` | 平滑度级别 | 0.0, 0.5, 0.9, 0.99, 1.0 |
+| `--output` | CSV 输出路径 | results.csv |
+| `--num-tokens` | 模拟 token 数量 | 1000 |
+| `--num-experts` | 专家总数 | 128 |
+| `--K` | 每个 token 选出的专家数 | 8 |
+| `--cache-size` | DDR 缓存容量 | 32 |
+| `--k1` | DDR 加载预算 | 3 |
+| `--k2` | PIM 计算预算 | 2 |
 
-## Architecture
+## 架构
 
-### Storage Hierarchy
+### 存储层次
 
 ```
 ┌─────────────────────────────────────────┐
-│               Flash Storage              │
-│         (Slow, Large Capacity)          │
+│               Flash 存储                  │
+│         (慢速, 大容量)                   │
 └──────────────┬──────────────────────────┘
                │
         ┌──────┴──────┐
         │             │
-   Load to DDR    Direct to PIM
+   加载到 DDR     直接到 PIM
         │             │
         ▼             ▼
 ┌──────────────┐ ┌──────────────┐
 │     DDR      │ │     PIM      │
-│  (Fast RAM)  │ │ (In-Memory)  │
+│  (快速内存)  │ │  (内存计算)  │
 └──────┬───────┘ └──────────────┘
        │
        ▼
 ┌──────────────┐
 │     NPU      │
-│  (Compute)   │
+│   (计算)    │
 └──────────────┘
 ```
 
-### Bandwidth Model (Normalized)
+### 带宽模型（归一化）
 
-| Path | Bandwidth | Latency per Expert |
-|------|----------|-------------------|
+| 路径 | 带宽 | 每个专家延迟 |
+|------|------|-------------|
 | Flash → DDR → NPU | 1 + 8 | 1.125 |
 | Flash → PIM | 4 | 0.25 |
-| DDR → NPU (cache hit) | 8 | 0.125 |
+| DDR → NPU（缓存命中） | 8 | 0.125 |
 
-### Routing Strategies
+### 路由策略
 
-| Strategy | Description |
-|----------|-------------|
-| **LRU** | All experts loaded to DDR, pure LRU management |
-| **PIM-Only** | All experts via Flash→PIM, no DDR caching |
-| **Hybrid** | Smart allocation: k1→DDR, k2→PIM, k3→cache |
-| **Fixed-Split** | Fixed position split (first k1→DDR, next k2→PIM) |
-| **Cache-Only** | Only use cached experts, rest via PIM |
+| 策略 | 描述 |
+|------|------|
+| **LRU** | 所有专家加载到 DDR，纯 LRU 管理 |
+| **PIM-Only** | 所有专家走 Flash→PIM，无 DDR 缓存 |
+| **Hybrid** | 智能分配：k1→DDR，k2→PIM，k3→缓存 |
+| **Fixed-Split** | 固定位置分割（前 k1→DDR，后 k2→PIM） |
+| **Cache-Only** | 只使用缓存专家，其余走 PIM |
 
-### Latency Calculation
+### 延迟计算
 
-For each token, the latency is the **maximum** of parallel paths:
+每个 token 的延迟是并行路径的**最大值**：
 
 ```
 latency = max(k1 × 1.125, k2 × 0.25, k3 × 0.125)
 ```
 
-Where:
-- k1 = number of experts via Flash→DDR→NPU
-- k2 = number of experts via Flash→PIM  
-- k3 = number of experts via DDR cache hit
+其中：
+- k1 = 通过 Flash→DDR→NPU 的专家数
+- k2 = 通过 Flash→PIM 的专家数
+- k3 = DDR 缓存命中的专家数
 
-## Project Structure
+## 项目结构
 
 ```
 pim_estimation/
@@ -125,39 +107,39 @@ pim_estimation/
 │   ├── core/
 │   │   ├── cache.py          # ExpertCache (LRU)
 │   │   ├── config.py         # RouterConfig
-│   │   ├── latency.py        # BandwidthModel, LatencyCalculator
-│   │   ├── config_loader.py  # YAML/JSON loader
-│   │   ├── runner.py         # Simulation runner
-│   │   └── results.py        # Results aggregation
+│   │   ├── latency.py        # 带宽模型和延迟计算
+│   │   ├── config_loader.py  # YAML/JSON 配置加载
+│   │   ├── runner.py         # 模拟运行器
+│   │   └── results.py        # 结果聚合
 │   ├── strategies/
-│   │   ├── base.py          # RoutingStrategy (ABC)
-│   │   ├── factory.py       # StrategyFactory
-│   │   ├── lru.py           # LRUStrategy
-│   │   ├── pim_only.py      # PIMOnlyStrategy
-│   │   ├── hybrid.py        # HybridStrategy
-│   │   ├── fixed_split.py   # FixedSplitStrategy
-│   │   └── cache_only.py   # CacheOnlyStrategy
-│   └── main.py              # CLI entry point
-├── tests/                   # Test suite (111 tests)
+│   │   ├── base.py           # 路由策略基类
+│   │   ├── factory.py        # 策略工厂
+│   │   ├── lru.py           # LRU 策略
+│   │   ├── pim_only.py      # PIM-Only 策略
+│   │   ├── hybrid.py        # Hybrid 策略
+│   │   ├── fixed_split.py   # Fixed-Split 策略
+│   │   └── cache_only.py    # Cache-Only 策略
+│   └── main.py               # CLI 入口
+├── tests/                    # 测试套件（111 个测试）
 ├── examples/
-│   └── config.yaml         # Example configuration
-└── AGENTS.md               # Agent guidelines
+│   └── config.yaml          # 示例配置
+└── AGENTS.md               # Agent 开发指南
 ```
 
-## Testing
+## 测试
 
 ```bash
-# Run all tests
+# 运行所有测试
 pytest tests/ -v
 
-# Run specific test file
+# 运行特定测试文件
 pytest tests/test_strategies.py -v
 
-# Run with coverage
+# 带覆盖率
 pytest tests/ --cov=moe_simulator
 ```
 
-## Example Output
+## 示例输出
 
 ```
 strategy   smoothness   avg_latency   cache_hit_rate
@@ -170,14 +152,14 @@ pim_only   0.5         32.0           0.0%
 pim_only   1.0         32.0           0.0%
 ```
 
-## Original LRU Router
+## 原始 LRU 路由器
 
-The `lru_router/` directory contains the original PyTorch implementation of the LRU-aware differentiable router. This is kept for reference but the new simulator (`moe_simulator/`) is the recommended way to evaluate routing strategies.
+`lru_router/` 目录包含原始的 PyTorch 实现的可微 LRU 路由器。保留用于参考，但新的模拟器（`moe_simulator/`）是推荐用于评估路由策略的方式。
 
-## License
+## 许可证
 
 MIT License
 
-## Author
+## 作者
 
 Hanlin Xu - hanlinxuy@gmail.com
