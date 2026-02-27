@@ -1,0 +1,28 @@
+# MoE Router Simulator Configuration
+# Default configuration for running routing strategy experiments
+
+# Router parameters
+num_experts: 128    # Total number of available experts
+K: 8                # Number of experts to select per token (top-K routing)
+cache_size: 32      # Maximum number of experts to keep in cache
+k1: 3               # First threshold for load balancing (DDR path limit)
+k2: 2               # Second threshold for load balancing (PIM path limit)
+
+# Bandwidth model (normalized values)
+flash_to_ddr: 1.0   # Bandwidth from Flash to DDR
+ddr_to_npu: 8.0     # Bandwidth from DDR to NPU  
+flash_to_pim: 4.0   # Bandwidth from Flash to PIM
+
+# Simulation settings
+num_tokens: 1000     # Number of tokens to simulate
+random_seed: 42      # Random seed for reproducibility
+
+# Smoothness levels to test
+# 0.0 = random workload (high cache miss)
+# 1.0 = static workload (low cache miss after warmup)
+smoothness_levels:
+  - 0.0
+  - 0.5
+  - 0.9
+  - 0.99
+  - 1.0
